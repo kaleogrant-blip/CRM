@@ -1,1 +1,52 @@
-<!DOCTYPE html><html><head><meta charset="utf-8"><title>3-Week Sales Report</title></head><body><h1>Index Placeholder</h1><p>Source dashboard not found in this environment.</p></body></html>
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sales Team CRM — Upload Edition v2</title>
+    <!-- Tailwind for quick styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React and ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <!-- Babel for JSX transpilation in browser -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Recharts for charts -->
+    <script src="https://unpkg.com/recharts/umd/Recharts.min.js"></script>
+    <!-- SheetJS for parsing Excel -->
+    <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+    <!-- dayjs for date operations -->
+    <script src="https://unpkg.com/dayjs/dayjs.min.js"></script>
+    <script src="https://unpkg.com/dayjs/plugin/utc.js"></script>
+    <script src="https://unpkg.com/dayjs/plugin/timezone.js"></script>
+    <style>
+      body {
+        background: linear-gradient(135deg, #fff7ed, #ffedd5, #fde68a);
+        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans",
+          sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+      }
+      .card {
+        border-radius: 1rem;
+        box-shadow: 0 6px 24px rgba(0, 0, 0, 0.08);
+        background: rgba(255, 255, 255, 0.9);
+      }
+      .table-wrap {
+        border-radius: 1rem;
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        overflow-x: auto;
+      }
+      .sticky-head th {
+        position: sticky;
+        top: 0;
+        background: #fff;
+        z-index: 1;
+      }
+    </style>
+  </head>
+  <body class="min-h-screen p-6">
+    <div id="root"></div>
+    <!-- Include the React component as a module via Babel -->
+    <script type="text/babel" data-type="module" src="./app.jsx"></script>
+  </body>
+</html>
