@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Product‑Level CRM</title>
+  <style>
+    body {
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      background: radial-gradient(circle at 20% 20%, rgba(255, 226, 226, 0.6), rgba(255, 255, 255, 0.6) 40%, rgba(229, 235, 255, 0.6) 75%) fixed;
+      background-size: 200% 200%;
+      animation: moveBg 30s linear infinite;
+      color: #4a2c2a;
+      margin: 0;
+      padding: 20px;
+      scroll-behavior: smooth;
+    }
+    @keyframes moveBg {
+      0% { background-position: 0 0; }
+      100% { background-position: 100% 100%; }
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+    .kpi-card {
+      display: inline-block;
+      background: linear-gradient(135deg, rgba(255,250,240,0.9), rgba(255,230,237,0.9));
+      border-radius: 16px;
+      padding: 14px 20px;
+      margin: 8px;
+      box-shadow:
+        0 2px 4px rgba(0,0,0,0.1),
+        0 6px 12px rgba(0,0,0,0.05),
+        inset 0 0 8px rgba(255,255,255,0.5);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    .kpi-card:hover {
+      transform: translateY(-4px);
+      box-shadow:
+        0 4px 8px rgba(0,0,0,0.15),
+        0 10px 20px rgba(0,0,0,0.08),
+        inset 0 0 10px rgba(255,255,255,0.6);
+    }
+    .kpi-card h2 { margin:0; font-size:0.75em; color:#5d4037; text-transform:uppercase; letter-spacing:0.05em; }
+    .kpi-card p { margin:8px 0 0; font-size:1.4em; font-weight:bold; color:#4a2c2a; }
+
+    .controls {
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .controls select, .controls button {
+      padding: 6px 10px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      font-size: 0.85em;
+    }
+    .heatmap {
+      display: block;
+      width: 100%;
+      border-radius: 12px;
+      overflow-x: auto;
+      transform-origin: top left;
+    }
+    .heatmap-row { display:flex; align-items:stretch; margin-bottom:2px; }
+    .heatmap-cell { flex:1; min-width:80px; padding:8px; text-align:center; border:1px solid rgba(255,255,255,0.3); font-size:0.85em; }
+    .heatmap-header-cell { background: rgba(230,215,200,0.7); color:#4a2c2a; font-size:0.9em; position: sticky; top:0; z-index:3; }
+    .heatmap-name-cell { min-width:160px; text-align:left; font-weight:600; background: rgba(250,240,235,0.8); position: sticky; left:0; z-index:2; }
+    .overlay {
+      position: absolute;
+      pointer-events: none;
+      background: linear-gradient(135deg, rgba(255,245,235,0.95), rgba(255,230,240,0.95));
+      border-radius: 12px;
+      padding: 12px 16px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 0 6px rgba(0, 0, 0, 0.05), inset 0 0 4px rgba(255,255,255,0.5);
+      opacity: 0;
+      transform: translateY(10px) scale(0.95);
+      transition: opacity 0.3s ease, transform 0.3s ease;
+      z-index: 1000;
+      max-width: 300px;
+      display: none;
+    }
+    .overlay.visible { opacity: 1; transform: translateY(0) scale(1); display:block; }
+    @media (max-width: 600px) {
+      .header { flex-direction: column; align-items: flex-start; }
+      .kpi-card { width: 100%; margin: 6px 0; }
+      .heatmap-cell { min-width: 60px; padding: 6px; font-size: 0.7em; }
+      .heatmap-name-cell { min-width: 120px; font-size: 0.75em; }
+      .heatmap-header-cell { font-size: 0.75em; padding: 6px; }
+      .overlay { max-width: 90%; font-size: 0.8em; padding: 10px 12px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1 style="margin:0; font-size:2.2em; color:#d88a00;">Product CRM</h1>
+    <div id="kpiContainer"></div>
+  </div>
+  <div class="controls">
+    <label for="categoryFilter">Category:</label>
+    <select id="categoryFilter">
+      <option value="all">All Categories</option>
+    </select>
+    <button id="zoomIn">Zoom In</button>
+    <button id="zoomOut">Zoom Out</button>
+  </div>
+  <div id="heatmapContainer" class="heatmap"></div>
+  <div id="overlay" class="overlay"></div>
+
+<script>
+  let metricDefs = [];
+  let metricRanges = [];
+  let productsData = [];
+  let zoomLevel = 1;
+  let hideTimeout;
+  const heatmapContainer = document.getElementById('heatmapContainer');
+  const overlay = document.getElementById('overlay');
+
+  function colorScale(r) {
+    r = Math.max(0, Math.min(1, r));
+    const hue = 240 * (1 - r);
+    const saturation = 70;
+    const lightness = 85 - 15 * r;
+    return `hsl(${hue.toFixed(0)}, ${saturation}%, ${lightness}%)`;
+  }
+
+  function formatNumber(value, decimals = 0) {
+    if (!Number.isFinite(value)) return 'N/A';
+    return value.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+  }
+
+  async function loadData() {
+    const res = await fetch('product_crm_data.json');
+    if (!res.ok) throw new Error('Failed to load data');
+    const data = await res.json();
+    productsData = data.products || [];
+    updateCategoryFilter();
+    render(productsData);
+  }
+
+  function updateCategoryFilter() {
+    const select = document.getElementById('categoryFilter');
+    // extract unique categories
+    const categories = Array.from(new Set(productsData.map(p => p.category)));
+    categories.sort();
+    categories.forEach(cat => {
+      const option = document.createElement('option');
+      option.value = cat;
+      option.textContent = cat;
+      select.appendChild(option);
+    });
+    select.addEventListener('change', () => {
+      const value = select.value;
+      const filtered = value === 'all' ? productsData : productsData.filter(p => p.category === value);
+      render(filtered);
+    });
+  }
+
+  function render(data) {
+    // compute KPIs
+    const totalRevenue = data.reduce((sum, p) => sum + (p.revenue || 0), 0);
+    const totalUnits = data.reduce((sum, p) => sum + (p.units || 0), 0);
+    document.getElementById('kpiContainer').innerHTML = [
+      kpiCard('Total Revenue', `$${formatNumber(totalRevenue)}`),
+      kpiCard('Total Units', `${formatNumber(totalUnits)}`)
+    ].join('');
+
+    metricDefs = [
+      { key:'ppi_index', label:'PPI' },
+      { key:'sell_through_pct', label:'Sell‑Through' },
+      { key:'revenue_share', label:'Revenue Share' },
+      { key:'bei', label:'BEI' }
+    ];
+    metricRanges = metricDefs.map(def => {
+      const values = data.map(p => p[def.key]).filter(v => Number.isFinite(v));
+      const min = Math.min(...values);
+      const max = Math.max(...values);
+      return { min, max };
+    });
+
+    // clear container
+    heatmapContainer.innerHTML = '';
+
+    // header row
+    const headerRow = document.createElement('div');
+    headerRow.className = 'heatmap-row';
+    const corner = document.createElement('div');
+    corner.className = 'heatmap-cell heatmap-name-cell';
+    corner.textContent = 'Product';
+    headerRow.appendChild(corner);
+    metricDefs.forEach(def => {
+      const cell = document.createElement('div');
+      cell.className = 'heatmap-cell heatmap-header-cell';
+      cell.textContent = def.label;
+      headerRow.appendChild(cell);
+    });
+    heatmapContainer.appendChild(headerRow);
+
+    // data rows
+    data.forEach(product => {
+      const row = document.createElement('div');
+      row.className = 'heatmap-row';
+      const nameCell = document.createElement('div');
+      nameCell.className = 'heatmap-cell heatmap-name-cell';
+      nameCell.textContent = product.product_name;
+      row.appendChild(nameCell);
+      metricDefs.forEach((def, idx) => {
+        const cell = document.createElement('div');
+        cell.className = 'heatmap-cell';
+        const value = product[def.key];
+        const range = metricRanges[idx];
+        let ratio = 0;
+        if (Number.isFinite(value) && range.max !== range.min) {
+          if (def.key === 'bei') {
+            const lv = Math.log(value + 1);
+            const lmin = Math.log(range.min + 1);
+            const lmax = Math.log(range.max + 1);
+            ratio = (lv - lmin) / (lmax - lmin);
+          } else {
+            ratio = (value - range.min) / (range.max - range.min);
+          }
+        }
+        cell.style.backgroundColor = colorScale(ratio);
+        cell.dataset.value = value;
+        cell.dataset.metric = def.label;
+        cell.dataset.product = product.product_name;
+        cell.addEventListener('mouseenter', e => showOverlay(e, product));
+        cell.addEventListener('mouseleave', hideOverlay);
+        row.appendChild(cell);
+      });
+      heatmapContainer.appendChild(row);
+    });
+
+    // apply current zoom level
+    heatmapContainer.style.transform = `scale(${zoomLevel})`;
+  }
+
+  function kpiCard(title, value) {
+    return `<div class="kpi-card"><h2>${title}</h2><p>${value}</p></div>`;
+  }
+
+  function showOverlay(event, product) {
+    clearTimeout(hideTimeout);
+    let html = `<h3>${product.product_name}</h3>`;
+    metricDefs.forEach((def, idx) => {
+      const value = product[def.key];
+      const range = metricRanges[idx];
+      let ratio = 0;
+      if (Number.isFinite(value) && range.max !== range.min) {
+        if (def.key === 'bei') {
+          const lv = Math.log(value + 1);
+          const lmin = Math.log(range.min + 1);
+          const lmax = Math.log(range.max + 1);
+          ratio = (lv - lmin) / (lmax - lmin);
+        } else {
+          ratio = (value - range.min) / (range.max - range.min);
+        }
+      }
+      const display = (def.key === 'sell_through_pct' || def.key === 'revenue_share')
+        ? `${(value * 100).toFixed(1)}%`
+        : (Number.isFinite(value) ? value.toFixed(2) : 'N/A');
+      html += `
+        <div class="metric-row" style="display:flex;align-items:center;margin-bottom:6px;font-size:0.85em;color:#4a2c2a;">
+          <div class="metric-name" style="flex:0 0 90px;text-align:left;font-weight:600;">${def.label}</div>
+          <div class="metric-bar-container" style="flex:1;height:8px;border-radius:4px;background:rgba(255,255,255,0.6);margin-right:8px;overflow:hidden;">
+            <div class="metric-bar" style="height:100%;border-radius:4px;width:${(ratio * 100).toFixed(1)}%;background-color:${colorScale(ratio)};"></div>
+          </div>
+          <div class="metric-value" style="flex:0 0 45px;text-align:right;font-weight:600;">${display}</div>
+        </div>`;
+    });
+    overlay.innerHTML = html;
+    overlay.classList.add('visible');
+    const rect = event.target.getBoundingClientRect();
+    overlay.style.top = `${window.scrollY + rect.top - overlay.offsetHeight - 10}px`;
+    overlay.style.left = `${window.scrollX + rect.left + 10}px`;
+  }
+
+  function hideOverlay() {
+    hideTimeout = setTimeout(() => {
+      overlay.classList.remove('visible');
+    }, 600);
+  }
+
+  document.getElementById('zoomIn').addEventListener('click', () => {
+    zoomLevel = Math.min(2, zoomLevel + 0.1);
+    heatmapContainer.style.transform = `scale(${zoomLevel})`;
+  });
+  document.getElementById('zoomOut').addEventListener('click', () => {
+    zoomLevel = Math.max(0.5, zoomLevel - 0.1);
+    heatmapContainer.style.transform = `scale(${zoomLevel})`;
+  });
+
+  window.addEventListener('DOMContentLoaded', loadData);
+</script>
+</body>
+</html>
