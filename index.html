@@ -294,9 +294,21 @@ async function loadData() {
           ratio = (value - range.min) / (range.max - range.min);
         }
       }
-      const display = (def.key === 'sell_through_pct' || def.key === 'revenue_share')
-        ? `${(value * 100).toFixed(1)}%`
-        : (Number.isFinite(value) ? value.toFixed(2) : 'N/A');
+      let display;
+      // Format percentages as before
+      if (def.key === 'sell_through_pct' || def.key === 'revenue_share') {
+        display = `${(value * 100).toFixed(1)}%`;
+      } else if (def.key === 'ppi_index') {
+        // Avoid rounding very small PPI values down to zero by using more precision
+        // Use three decimal places for PPI values below 0.01 and two decimals otherwise
+        if (Number.isFinite(value)) {
+          display = value < 0.01 ? value.toFixed(3) : value.toFixed(2);
+        } else {
+          display = 'N/A';
+        }
+      } else {
+        display = Number.isFinite(value) ? value.toFixed(2) : 'N/A';
+      }
       html += `
         <div class="metric-row" style="display:flex;align-items:center;margin-bottom:6px;font-size:0.85em;color:#4a2c2a;">
           <div class="metric-name" style="flex:0 0 90px;text-align:left;font-weight:600;">${def.label}</div>
