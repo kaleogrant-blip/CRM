@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Product‑Level CRM</title>
+  <title>Product PPI + Sell‑Through + Revenue CRM</title>
   <style>
     body {
       font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
@@ -97,7 +97,7 @@
 </head>
 <body>
   <div class="header">
-    <h1 style="margin:0; font-size:2.2em; color:#d88a00;">Product CRM</h1>
+    <h1 id="pageTitle" style="margin:0; font-size:2.2em; color:#d88a00;">Product CRM</h1>
     <div id="kpiContainer"></div>
   </div>
   <div class="controls">
@@ -115,6 +115,7 @@
   let metricDefs = [];
   let metricRanges = [];
   let productsData = [];
+  let fullMetricRanges = [];
   let zoomLevel = 1;
   let hideTimeout;
   const heatmapContainer = document.getElementById('heatmapContainer');
@@ -134,11 +135,38 @@
   }
 
   async function loadData() {
-    const res = await fetch('product_crm_data.json');
+    const url = `product_crm_data.json?v=${Date.now()}`;
+    const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) throw new Error('Failed to load data');
     const data = await res.json();
     productsData = data.products || [];
+    // update page title based on meta.title if available
+    if (data.meta && data.meta.title) {
+      const titleElem = document.getElementById('pageTitle');
+      if (titleElem) titleElem.textContent = data.meta.title;
+      document.title = data.meta.title;
+    }
+    // create a tiny badge to show as_of date
+    if (data.meta && data.meta.as_of) {
+      const badge = document.createElement('div');
+      badge.style.cssText = 'position:fixed;right:12px;bottom:12px;background:rgba(0,0,0,.55);color:#fff;padding:6px 10px;border-radius:8px;font:12px/1.2 system-ui;z-index:9999';
+      badge.textContent = `Data as_of: ${data.meta.as_of}`;
+      document.body.appendChild(badge);
+    }
     updateCategoryFilter();
+    // compute full metric ranges once based on full dataset for consistent colour scaling
+    metricDefs = [
+      { key:'ppi_index', label:'PPI' },
+      { key:'sell_through_pct', label:'Sell‑Through' },
+      { key:'revenue_share', label:'Revenue Share' },
+      { key:'bei', label:'BEI' }
+    ];
+    fullMetricRanges = metricDefs.map(def => {
+      const values = productsData.map(p => p[def.key]).filter(v => Number.isFinite(v));
+      const min = Math.min(...values);
+      const max = Math.max(...values);
+      return { min, max };
+    });
     render(productsData);
   }
 
@@ -169,18 +197,8 @@
       kpiCard('Total Units', `${formatNumber(totalUnits)}`)
     ].join('');
 
-    metricDefs = [
-      { key:'ppi_index', label:'PPI' },
-      { key:'sell_through_pct', label:'Sell‑Through' },
-      { key:'revenue_share', label:'Revenue Share' },
-      { key:'bei', label:'BEI' }
-    ];
-    metricRanges = metricDefs.map(def => {
-      const values = data.map(p => p[def.key]).filter(v => Number.isFinite(v));
-      const min = Math.min(...values);
-      const max = Math.max(...values);
-      return { min, max };
-    });
+    // use precomputed full metric ranges for consistent colour scaling across filters
+    metricRanges = fullMetricRanges;
 
     // clear container
     heatmapContainer.innerHTML = '';
@@ -272,6 +290,13 @@
           <div class="metric-value" style="flex:0 0 45px;text-align:right;font-weight:600;">${display}</div>
         </div>`;
     });
+    // show additional details such as category and units on hand
+    if (product.category) {
+      html += `<div style="margin-top:6px;font-size:0.8em;color:#4a2c2a;"><strong>Category:</strong> ${product.category}</div>`;
+    }
+    if (product.units_on_hand !== undefined) {
+      html += `<div style="font-size:0.8em;color:#4a2c2a;"><strong>Units On Hand:</strong> ${formatNumber(product.units_on_hand)}</div>`;
+    }
     overlay.innerHTML = html;
     overlay.classList.add('visible');
     const rect = event.target.getBoundingClientRect();
