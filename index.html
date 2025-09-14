@@ -134,41 +134,55 @@
     return value.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
   }
 
-  async function loadData() {
+  
+async function loadData() {
+  // Load data from an embedded JSON blob if available; fall back to fetch for local development.
+  let data;
+  const embedded = document.getElementById('productData');
+  if (embedded) {
+    try {
+      data = JSON.parse(embedded.textContent);
+    } catch (err) {
+      console.error('Failed to parse embedded data', err);
+    }
+  }
+  if (!data) {
     const url = `product_crm_data.json?v=${Date.now()}`;
     const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) throw new Error('Failed to load data');
-    const data = await res.json();
-    productsData = data.products || [];
-    // update page title based on meta.title if available
-    if (data.meta && data.meta.title) {
-      const titleElem = document.getElementById('pageTitle');
-      if (titleElem) titleElem.textContent = data.meta.title;
-      document.title = data.meta.title;
-    }
-    // create a tiny badge to show as_of date
-    if (data.meta && data.meta.as_of) {
-      const badge = document.createElement('div');
-      badge.style.cssText = 'position:fixed;right:12px;bottom:12px;background:rgba(0,0,0,.55);color:#fff;padding:6px 10px;border-radius:8px;font:12px/1.2 system-ui;z-index:9999';
-      badge.textContent = `Data as_of: ${data.meta.as_of}`;
-      document.body.appendChild(badge);
-    }
-    updateCategoryFilter();
-    // compute full metric ranges once based on full dataset for consistent colour scaling
-    metricDefs = [
-      { key:'ppi_index', label:'PPI' },
-      { key:'sell_through_pct', label:'Sell‑Through' },
-      { key:'revenue_share', label:'Revenue Share' },
-      { key:'bei', label:'BEI' }
-    ];
-    fullMetricRanges = metricDefs.map(def => {
-      const values = productsData.map(p => p[def.key]).filter(v => Number.isFinite(v));
-      const min = Math.min(...values);
-      const max = Math.max(...values);
-      return { min, max };
-    });
-    render(productsData);
+    data = await res.json();
   }
+  productsData = data.products || [];
+  // update page title based on meta.title if available
+  if (data.meta && data.meta.title) {
+    const titleElem = document.getElementById('pageTitle');
+    if (titleElem) titleElem.textContent = data.meta.title;
+    document.title = data.meta.title;
+  }
+  // create a tiny badge to show as_of date
+  if (data.meta && data.meta.as_of) {
+    const badge = document.createElement('div');
+    badge.style.cssText = 'position:fixed;right:12px;bottom:12px;background:rgba(0,0,0,.55);color:#fff;padding:6px 10px;border-radius:8px;font:12px/1.2 system-ui;z-index:9999';
+    badge.textContent = `Data as_of: ${data.meta.as_of}`;
+    document.body.appendChild(badge);
+  }
+  updateCategoryFilter();
+  // compute full metric ranges once based on full dataset for consistent colour scaling
+  metricDefs = [
+    { key:'ppi_index', label:'PPI' },
+    { key:'sell_through_pct', label:'Sell‑Through' },
+    { key:'revenue_share', label:'Revenue Share' },
+    { key:'bei', label:'BEI' }
+  ];
+  fullMetricRanges = metricDefs.map(def => {
+    const values = productsData.map(p => p[def.key]).filter(v => Number.isFinite(v));
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    return { min, max };
+  });
+  render(productsData);
+}
+
 
   function updateCategoryFilter() {
     const select = document.getElementById('categoryFilter');
